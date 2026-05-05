@@ -1,0 +1,39 @@
+ThimPOSv0.1 (hệ thống POS giá rẻ đơn giản cho shop nhỏ)
+
+làm gì:
+ - cho phép quản lý các sản phẩm
+ - cho phép quản lý đơn:tạo đơn, xóa đơn, sửa đơn, in bill theo đơn
+ - cho phép admin quản lý cơ sở dữ liệu và website ở mức cơ bản
+ 
+tech stack: drogon1.9.2 với mingw64 c++20, coroutine-first (chặn callback trừ khi ko support coroutine)
+db: sqlite3 tích hợp trong drogon, tên db chính là default, cấm ORM model (bắt buộc dùng lệnh sql chay)
+
+quy tắc:
+ - dùng các plugin class như service, nghĩa là dùng luôn 1 plugin=1service. vì vậy ta có thể getPlugin (nhưng phải tuân thủ nghiêm ngặt kỷ luật để tránh coupling)
+ - repo class muốn db thì ko cần wiring loằng ngoằng, có thể dùng luôn .app().getDBClient()
+ - class header phải rõ ràng (complete-type), cấm virtual, phần header này sau đó sẽ được các dev khác implement .cc luôn nên .h vừa là doc, vừa là header để khóa implement. vì vậy implement ko được phép thêm bất cứ thứ gì khác mà chỉ được phép implement logic
+ - hy sinh tính cơ động textbook để ship nhanh (nhưng cấm coupling và phải dễ mở rộng về sau)
+ - ko tạo namespace
+ - các plugin/service tự lo DB table của mình (phải tự tạo nếu chưa tồn tại)
+ - dùng doxygen comment cho mọi thứ để đóng vai trò như doc luôn
+
+phần products (chủ yếu liệt kê các loại sản phẩm, chưa quản lý tồn kho):
+ * ProductManagerService (plugin):
+  - cung cấp các CRUD
+  - sở hữu 1 repo instance
+ * ProductRepo:
+  - quản lý bảng products
+ * struct products: chứa các field cần thiết đối với 1 sản phẩm (lưu ý: giá tiền để số nguyên)
+
+
+phần orders (chủ yếu quản lý đơn như 1 recorder, có trỏ tới 1 product trong bảng products)
+ * OrderService
+ * OrderRepo
+  - quản lý bảng orders
+  - quản lý bảng order_items
+ * struct Order
+
+phần TxtPrinter (cực mỏng):
+ * TxtPrinterService (plugin)
+  - 1 hàm save string sang 1 file .txt
+  - 1 hàm in file .txt (thực chất bên dưới gọi async lệnh cmd "notepad /pt filename" )

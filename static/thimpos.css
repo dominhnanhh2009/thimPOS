@@ -1,0 +1,114 @@
+/* ========== ThimPOS Core Layout ========== */
+
+:root {
+    --tp-bg: #0f172a;
+    --tp-panel: #111827;
+    --tp-hover: #1f2937;
+    --tp-active: #2563eb;
+    --tp-text: #e5e7eb;
+    --tp-muted: #9ca3af;
+}
+
+/* reset nhẹ */
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    display: flex;
+    min-height: 100vh;
+    background: #f3f4f6;
+}
+
+/* ========== Sidebar ========== */
+.tp-sidebar {
+    width: 260px;
+    background: var(--tp-bg);
+    color: var(--tp-text);
+    padding: 12px;
+    box-sizing: border-box;
+}
+
+.tp-brand {
+    font-weight: bold;
+    font-size: 18px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    color: white;
+}
+
+/* folder */
+.tp-folder {
+    margin-top: 10px;
+}
+
+.tp-folder-title {
+    padding: 10px 12px;
+    color: var(--tp-muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* link */
+.tp-link {
+    display: block;
+    padding: 10px 12px;
+    margin: 4px 0;
+    border-radius: 8px;
+    color: var(--tp-text);
+    text-decoration: none;
+    transition: 0.15s;
+    font-size: 14px;
+}
+
+.tp-link:hover {
+    background: var(--tp-hover);
+}
+
+.tp-link.active {
+    background: var(--tp-active);
+    color: white;
+}
+
+/* ========== Main Content ========== */
+.tp-main {
+    flex: 1;
+    padding: 20px;
+    box-sizing: border-box;
+    overflow-x: auto;
+    margin-top: 56px; /* thêm dòng này */
+}
+
+/* ========== Navbar ========== */
+.tp-navbar {
+    position: fixed;
+    top: 0;
+    left: 260px;
+    right: 0;
+    height: 56px;
+    background: #0b1220;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    box-sizing: border-box;
+    border-bottom: 1px solid #1f2937;
+    z-index: 1000;
+}
+
+.tp-navbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tp-logo {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 6px rgba(37, 99, 235, 0.6));
+}
+
+.tp-navbar-title {
+    color: white;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}

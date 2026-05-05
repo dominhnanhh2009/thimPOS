@@ -1,0 +1,6 @@
+đồng bộ hóa error_response trong các contract
+cải thiện UI
+vẽ dependency graph
+làm tài liệu hướng dẫn
+
+commit 1.5

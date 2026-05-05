@@ -1,0 +1,22 @@
+# ninja log v7
+4	13731	7996096369122649	CMakeFiles/ThimPOS.dir/main.cc.obj	261a045f77b1c658
+48	14164	7996096369618365	CMakeFiles/ThimPOS.dir/filters/AuthNFilter.cc.obj	50bef51c7a601b88
+60	14334	7996096369787875	CMakeFiles/ThimPOS.dir/filters/AuthZFilter.cc.obj	a15b702f5b0edbe8
+23	14717	7996096369285891	CMakeFiles/ThimPOS.dir/controllers/BillPrintController.cc.obj	abbdc549de1943b1
+9	14852	7996096369161319	CMakeFiles/ThimPOS.dir/controllers/AccountController.cc.obj	d1178d0554111763
+40	15037	7996096369493596	CMakeFiles/ThimPOS.dir/controllers/ProductManagerController.cc.obj	45d9d6a9ef2f9718
+29	15088	7996096369387830	CMakeFiles/ThimPOS.dir/controllers/OrderController.cc.obj	8f3c7d104cba4134
+14	15253	7996096369216093	CMakeFiles/ThimPOS.dir/controllers/AuthNController.cc.obj	f608281a82038ddf
+14396	25649	7996096513211872	CMakeFiles/ThimPOS.dir/plugins/AuthNRepo.cc.obj	8f8f220a0851ed17
+14174	25659	7996096510905383	CMakeFiles/ThimPOS.dir/plugins/AccountRepo.cc.obj	447a9588611bc2a3
+15055	26296	7996096519819766	CMakeFiles/ThimPOS.dir/plugins/OrderService.cc.obj	2a8e5898aa9c5cfb
+13761	26340	7996096506688327	CMakeFiles/ThimPOS.dir/plugins/AccountManagementService.cc.obj	b8ac2d33630c701f
+15089	26520	7996096520230290	CMakeFiles/ThimPOS.dir/plugins/ProductManagerService.cc.obj	3cf2d995fc5214b1
+14728	26621	7996096516473658	CMakeFiles/ThimPOS.dir/plugins/AuthNService.cc.obj	af62643a53440790
+15285	26629	7996096521947918	CMakeFiles/ThimPOS.dir/plugins/ProductRepo.cc.obj	e3a9fd9148730e58
+14856	27552	7996096517678565	CMakeFiles/ThimPOS.dir/plugins/OrderRepo.cc.obj	2d6a51d65e966cf7
+25650	34353	7996096625577755	CMakeFiles/ThimPOS.dir/plugins/TxtPrinterService.cc.obj	5da302e98ec1e562
+25660	34523	7996096625683045	CMakeFiles/ThimPOS.dir/plugins/convertOrderToBillString.cpp.obj	fdd23c63ed77b446
+26297	34886	7996096632034114	test/CMakeFiles/ThimPOS_test.dir/test_main.cc.obj	a5973c7d2d28f78c
+34886	35553	7996096717938231	test/ThimPOS_test.exe	4abb53ba1a5b73e9
+34524	35815	7996096714321487	ThimPOS.exe	c098cd432c091469

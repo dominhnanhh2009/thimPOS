@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>ThimPOS - Order CRUD UI</title>
+
+<style>
+body{
+    margin:0;
+    font-family: Arial, sans-serif;
+    background:#f6f7fb;
+    color:#222;
+    overflow-x:hidden;
+}
+
+.topbar{
+    padding:14px 18px;
+    background:#111827;
+    color:#fff;
+    font-weight:600;
+}
+
+.layout{
+    display:grid;
+    grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr) minmax(300px, 1.2fr);
+    gap:12px;
+    padding:12px;
+    height: calc(100vh - 50px);
+    box-sizing:border-box;
+    overflow:hidden;
+}
+
+.panel{
+    background:#fff;
+    border-radius:12px;
+    padding:12px;
+    overflow:auto;
+    min-width:0;
+    box-shadow:0 1px 6px rgba(0,0,0,0.05);
+}
+
+h2{
+    margin:0 0 10px 0;
+    font-size:15px;
+}
+
+input,button{
+    padding:6px 8px;
+    font-size:13px;
+}
+
+input{
+    border:1px solid #ddd;
+    border-radius:6px;
+}
+
+button{
+    border:0;
+    border-radius:6px;
+    cursor:pointer;
+    background:#e5e7eb;
+}
+
+button.ok{ background:#16a34a; color:#fff; }
+button.danger{ background:#ef4444; color:#fff; }
+
+.row{
+    display:flex;
+    gap:6px;
+    margin-bottom:8px;
+    flex-wrap:wrap;
+}
+
+.status{
+    font-size:12px;
+    margin-top:6px;
+}
+
+.ok{ color:#16a34a; }
+.error{ color:#dc2626; }
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+    table-layout:fixed;
+}
+
+th,td{
+    border-bottom:1px solid #eee;
+    padding:6px;
+    text-align:left;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.order-row:hover{
+    background:#f3f4f6;
+    cursor:pointer;
+}
+
+/* responsive */
+@media (max-width:1100px){
+    .layout{
+        grid-template-columns:1fr 1fr;
+        height:auto;
+        overflow:visible;
+    }
+    .panel:nth-child(1){
+        grid-column:1/3;
+    }
+}
+
+@media (max-width:700px){
+    .layout{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="topbar">🧾 ThimPOS Order CRUDUI</div>
+
+<div class="layout">
+
+<!-- CREATE -->
+
+<div class="panel">
+<h2>➕ Create Order</h2>
+
+<table>
+<thead>
+<tr><th>Product</th><th>Qty</th><th></th></tr>
+</thead>
+<tbody id="createItemsBody"></tbody>
+</table>
+
+<div class="row">
+<button onclick="addCreateRow()">+ item</button>
+<button class="ok" onclick="createOrder()">Create</button>
+<button onclick="clearCreateForm()">Reset</button>
+</div>
+
+<div id="createStatus" class="status"></div>
+</div>
+
+<!-- LIST -->
+
+<div class="panel">
+<h2>📄 Orders</h2>
+
+<div class="row">
+<input id="listLimit" type="number" value="20">
+<input id="listOffset" type="number" value="0">
+<button onclick="loadOrders()">Reload</button>
+</div>
+
+<table>
+<thead>
+<tr><th>ID</th><th>Total</th><th>Time</th></tr>
+</thead>
+<tbody id="orderListBody"></tbody>
+</table>
+
+<div id="listStatus" class="status"></div>
+</div>
+
+<!-- DETAIL -->
+
+<div class="panel">
+<h2>🔍 Detail</h2>
+
+<div class="row">
+<input id="detailId" type="number" placeholder="Order ID">
+<button onclick="loadDetail()">Load</button>
+<button class="danger" onclick="deleteCurrentDetail()">Delete</button>
+</div>
+
+<div id="detailBox">No order loaded</div>
+<div id="detailStatus" class="status"></div>
+</div>
+
+</div>
+
+<script>
+const API="/api/orders";
+
+let currentOrder=null;
+let editMode=false;
+
+/* time */
+function formatTime(ts){
+    const d=new Date(ts*1000);
+    const h=d.getHours();
+    const m=String(d.getMinutes()).padStart(2,'0');
+    const am=h>=12?"pm":"am";
+    const hh=h%12||12;
+    return `${hh}:${m}${am} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+
+/* utils */
+function setStatus(id,msg,type=""){
+    const el=document.getElementById(id);
+    el.className="status "+type;
+    el.textContent=msg;
+}
+
+function asInt(v){
+    const n=parseInt(v,10);
+    return Number.isFinite(n)?n:NaN;
+}
+
+async function fetchJSON(url,opt={}){
+    const r=await fetch(url,{headers:{"Content-Type":"application/json"},...opt});
+    const t=await r.text();
+    const d=t?JSON.parse(t):null;
+    if(!r.ok) throw new Error(d?.error||r.status);
+    return d;
+}
+
+/* CREATE */
+function addCreateRow(){
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+        <td><input type="number"></td>
+        <td><input type="number" value="1"></td>
+        <td><button onclick="this.closest('tr').remove()">x</button></td>
+    `;
+    createItemsBody.appendChild(tr);
+}
+
+function clearCreateForm(){
+    createItemsBody.innerHTML="";
+    addCreateRow();
+}
+
+function collectCreate(){
+    const rows=document.querySelectorAll("#createItemsBody tr");
+    const items=[];
+    rows.forEach(r=>{
+        const p=asInt(r.children[0].querySelector("input").value);
+        const q=asInt(r.children[1].querySelector("input").value);
+        if(p>0&&q>0) items.push({product_id:p,quantity:q});
+    });
+    return items;
+}
+
+async function createOrder(){
+    try{
+        setStatus("createStatus","creating...");
+        const items=collectCreate();
+        if(!items.length) throw new Error("empty");
+
+        const res = await fetchJSON(API,{
+            method:"POST",
+            body:JSON.stringify({items})
+        });
+
+        setStatus("createStatus","created ✔","ok");
+        clearCreateForm();
+        loadOrders();
+
+    }catch(e){
+        setStatus("createStatus",e.message,"error");
+    }
+}
+
+/* LIST */
+async function loadOrders(){
+    try{
+        const limit=asInt(listLimit.value)||20;
+        const offset=asInt(listOffset.value)||0;
+
+        const d=await fetchJSON(`${API}?limit=${limit}&offset=${offset}`);
+
+        orderListBody.innerHTML="";
+        d.items.forEach(o=>{
+            const tr=document.createElement("tr");
+            tr.className="order-row";
+            tr.onclick=()=>loadDetailById(o.id);
+
+            tr.innerHTML=`
+                <td>${o.id}</td>
+                <td>${o.total_price}</td>
+                <td>${formatTime(o.created_at)}</td>
+            `;
+            orderListBody.appendChild(tr);
+        });
+
+        setStatus("listStatus","loaded "+d.items.length,"ok");
+
+    }catch(e){
+        setStatus("listStatus",e.message,"error");
+    }
+}
+
+/* DETAIL */
+async function loadDetail(){
+    const id=asInt(detailId.value);
+    if(id>0) loadDetailById(id);
+}
+
+async function loadDetailById(id){
+    try{
+        const d=await fetchJSON(`${API}/${id}`);
+        currentOrder=d;
+        editMode=false;
+        renderDetail(d);
+    }catch(e){
+        setStatus("detailStatus",e.message,"error");
+    }
+}
+
+/* ADD ROW IN EDIT */
+function addDetailRow(pid="",qty=1){
+    const tbody=document.querySelector("#detailBox tbody");
+    if(!tbody) return;
+
+    const tr=document.createElement("tr");
+    tr.innerHTML=`
+        <td><input value="${pid}" type="number"></td>
+        <td><input value="${qty}" type="number"></td>
+        <td></td>
+        <td><button onclick="this.closest('tr').remove()">x</button></td>
+    `;
+    tbody.appendChild(tr);
+}
+
+/* RENDER */
+function renderDetail(d){
+
+    const rows=d.items.map(i=>`
+        <tr>
+            <td>${editMode?`<input value="${i.product_id}" type="number">`:i.product_id}</td>
+            <td>${editMode?`<input value="${i.quantity}" type="number">`:i.quantity}</td>
+            <td>${i.unit_price||""}</td>
+            <td>${editMode?`<button onclick="this.closest('tr').remove()">x</button>`:""}</td>
+        </tr>
+    `).join("");
+
+    detailBox.innerHTML=`
+        <div><b>ID:</b> ${d.id}</div>
+        <div><b>Total:</b> ${d.total_price}</div>
+        <div><b>Time:</b> ${formatTime(d.created_at)}</div>
+
+        <div class="row">
+            ${
+                editMode
+                ? `
+                    <button class="ok" onclick="saveEdit()">Save</button>
+                    <button onclick="cancelEdit()">Cancel</button>
+                    <button onclick="addDetailRow()">+ Add item</button>
+                `
+                : `
+                    <button onclick="toggleEdit()">Edit</button>
+                    <button class="ok" onclick="printCurrentOrder()">🖨️ Print</button>
+                `
+            }
+        </div>
+
+        <table>
+            <thead>
+                <tr><th>Product</th><th>Qty</th><th>Price</th><th></th></tr>
+            </thead>
+            <tbody>
+                ${rows}
+            </tbody>
+        </table>
+    `;
+}
+
+function toggleEdit(){
+    editMode=true;
+    renderDetail(currentOrder);
+}
+
+function cancelEdit(){
+    editMode=false;
+    renderDetail(currentOrder);
+}
+
+/* SAVE */
+async function saveEdit(){
+    try{
+        const rows=document.querySelectorAll("#detailBox tbody tr");
+        const items=[];
+
+        rows.forEach(r=>{
+            const i=r.querySelectorAll("input");
+            if(i.length){
+                const p=asInt(i[0].value);
+                const q=asInt(i[1].value);
+                if(p>0&&q>0) items.push({product_id:p,quantity:q});
+            }
+        });
+
+        await fetchJSON(`${API}/${currentOrder.id}`,{
+            method:"PUT",
+            body:JSON.stringify({items})
+        });
+
+        setStatus("detailStatus","saved ✔","ok");
+        editMode=false;
+        loadDetailById(currentOrder.id);
+        loadOrders();
+
+    }catch(e){
+        setStatus("detailStatus",e.message,"error");
+    }
+}
+
+/* PRINT */
+async function printCurrentOrder(){
+    try{
+        if(!currentOrder) throw new Error("no order");
+
+        setStatus("detailStatus","printing...");
+
+        const r = await fetch(`/api/printbill?id=${currentOrder.id}`);
+        const d = await r.json();
+
+        if(!r.ok || !d.success){
+            throw new Error(d.msg || "PRINT_FAILED");
+        }
+
+        setStatus("detailStatus","printed ✔","ok");
+
+    }catch(e){
+        setStatus("detailStatus",e.message,"error");
+    }
+}
+
+/* DELETE */
+async function deleteCurrentDetail(){
+    const id=asInt(detailId.value);
+    if(id>0){
+        await fetchJSON(`${API}/${id}`,{method:"DELETE"});
+        loadOrders();
+        detailBox.innerHTML="deleted";
+    }
+}
+
+/* INIT */
+addCreateRow();
+loadOrders();
+</script>
+
+<link rel="stylesheet" href="/thimpos.css">
+<script src="/thimpos.js" defer></script>
+
+</body>
+</html>

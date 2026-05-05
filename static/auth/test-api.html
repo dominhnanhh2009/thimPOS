@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AuthN Console</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 20px;
+        }
+        h2 {
+            margin-top: 30px;
+            color: #38bdf8;
+        }
+        input, button {
+            margin: 5px;
+            padding: 6px;
+            border-radius: 6px;
+            border: none;
+        }
+        button {
+            background: #38bdf8;
+            color: black;
+            cursor: pointer;
+        }
+        pre {
+            background: #020617;
+            padding: 10px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+
+<h1>🔐 AuthN Playground</h1>
+
+<!-- REGISTER -->
+<h2>Register</h2>
+<input id="reg_user" placeholder="username">
+<input id="reg_pass" placeholder="password" type="password">
+<button onclick="register()">Register</button>
+
+<!-- LOGIN -->
+<h2>Login</h2>
+<input id="login_user" placeholder="username">
+<input id="login_pass" placeholder="password" type="password">
+<button onclick="login()">Login</button>
+
+<!-- LOGOUT -->
+<h2>Logout</h2>
+<button onclick="logout()">Logout</button>
+<button onclick="logoutAll()">Logout All</button>
+
+<!-- ME -->
+<h2>Current User</h2>
+<button onclick="me()">GET /auth/me</button>
+
+<!-- SESSIONS -->
+<h2>Sessions</h2>
+<button onclick="sessions()">List Sessions</button>
+<input id="del_token" placeholder="token">
+<button onclick="deleteSession()">Delete Session</button>
+
+<!-- USERS -->
+<h2>All Users (manager)</h2>
+<button onclick="users()">Get Users</button>
+
+<!-- CHANGE PASSWORD -->
+<h2>Change Password (manager)</h2>
+<input id="cp_user" placeholder="username">
+<input id="cp_pass" placeholder="new password">
+<button onclick="changePassword()">Change</button>
+
+<h2>📦 Response</h2>
+<pre id="out"></pre>
+
+<script>
+const out = document.getElementById("out");
+
+function show(res) {
+    out.textContent = JSON.stringify(res, null, 2);
+}
+
+async function register() {
+    const res = await fetch("/auth/register", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            username: reg_user.value,
+            password: reg_pass.value
+        })
+    });
+    show(await res.json());
+}
+
+async function login() {
+    const res = await fetch("/auth/login", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        credentials: "include",
+        body: JSON.stringify({
+            username: login_user.value,
+            password: login_pass.value
+        })
+    });
+    show(await res.json());
+}
+
+async function logout() {
+    const res = await fetch("/auth/logout", {
+        method: "POST",
+        credentials: "include"
+    });
+    show(await res.json());
+}
+
+async function logoutAll() {
+    const res = await fetch("/auth/logout_all", {
+        method: "POST",
+        credentials: "include"
+    });
+    show(await res.json());
+}
+
+async function me() {
+    const res = await fetch("/auth/me", {
+        credentials: "include"
+    });
+    show(await res.json());
+}
+
+async function sessions() {
+    const res = await fetch("/auth/sessions", {
+        credentials: "include"
+    });
+    show(await res.json());
+}
+
+async function deleteSession() {
+    const token = document.getElementById("del_token").value;
+    const res = await fetch("/auth/sessions/" + token, {
+        method: "DELETE",
+        credentials: "include"
+    });
+    show(await res.json());
+}
+
+async function users() {
+    const res = await fetch("/auth/users", {
+        credentials: "include"
+    });
+    show(await res.json());
+}
+
+async function changePassword() {
+    const res = await fetch("/auth/change_password", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            username: cp_user.value,
+            new_password: cp_pass.value
+        })
+    });
+    show(await res.json());
+}
+</script>
+
+</body>
+</html>

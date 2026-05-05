@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>ThimPOS - Make Order</title>
+
+<style>
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding: 15px;
+    background-color: #f8f9fa;
+}
+
+/* layout */
+.container {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 20px;
+}
+
+.box {
+    border: 1px solid #ddd;
+    padding: 15px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+/* SEARCH & CATEGORY BAR */
+.control-panel {
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.quick-bar {
+    display: flex;
+    gap: 8px;
+}
+
+.category-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 5px 0;
+}
+
+.btn-cat {
+    padding: 6px 14px;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: 0.2s;
+}
+
+.btn-cat:hover { background: #f0f0f0; }
+.btn-cat.active {
+    background: #3498db;
+    color: white;
+    border-color: #3498db;
+}
+
+input {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    flex-grow: 1;
+}
+
+/* PRODUCT GRID */
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+    min-height: 400px;
+}
+
+.product-card {
+    border: 1px solid #eee;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: 0.2s;
+    background: white;
+    position: relative;
+}
+
+.product-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.product-img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    background: #fdfdfd;
+}
+
+.product-info {
+    padding: 10px;
+}
+
+.product-name {
+    font-size: 14px;
+    font-weight: 600;
+    height: 40px;
+    overflow: hidden;
+}
+
+.product-price {
+    color: #e53935;
+    font-weight: bold;
+    margin-top: 5px;
+}
+
+.product-cat-tag {
+    font-size: 10px;
+    color: #888;
+    text-transform: uppercase;
+}
+
+/* CART */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+td, th {
+    border-bottom: 1px solid #eee;
+    padding: 10px 6px;
+    text-align: left;
+}
+
+button {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.btn-primary { background: #2ecc71; color: white; border: none; font-weight: bold; }
+.btn-danger { background: #e74c3c; color: white; border: none; }
+
+.cart-total {
+    font-size: 20px;
+    font-weight: bold;
+    margin-top: 15px;
+    text-align: right;
+    color: #2c3e50;
+}
+
+/* TOAST */
+#toast-container {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 9999;
+}
+
+.toast {
+    min-width: 200px;
+    padding: 12px;
+    border-radius: 8px;
+    color: white;
+    font-size: 14px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    animation: slideIn 0.2s ease;
+}
+
+.toast.success { background: #2ecc71; }
+.toast.error { background: #e74c3c; }
+.toast.info { background: #3498db; }
+
+@keyframes slideIn {
+    from { transform: translateX(20px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+}
+</style>
+</head>
+
+<body>
+
+<div id="toast-container"></div>
+
+<h2>🧾 ThimPOS - Giao diện bán hàng</h2>
+
+<div class="control-panel">
+    <div class="quick-bar">
+        <input id="search" placeholder="Tìm tên sản phẩm...">
+        <button onclick="searchProducts()">Tìm kiếm</button>
+        <button onclick="loadProducts()">Tất cả</button>
+    </div>
+    
+    <div id="categoryBar" class="category-bar">
+        <!-- Categories will be rendered here -->
+    </div>
+</div>
+
+<div class="container">
+
+<!-- PRODUCTS -->
+<div class="box">
+    <h3 id="displayTitle">📦 Sản phẩm</h3>
+    <div id="productList" class="product-grid"></div>
+</div>
+
+<!-- CART -->
+<div class="box">
+    <h3>🛒 Đơn hiện tại</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Tên sản phẩm</th>
+                <th style="width: 60px;">SL</th>
+                <th style="text-align: right;">Giá</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="cart"></tbody>
+    </table>
+
+    <div class="cart-total" id="total">Tổng: 0đ</div>
+
+    <div style="margin-top:20px; display: flex; gap: 10px; justify-content: flex-end;">
+        <button class="btn-danger" onclick="clearCart()">🧹 Xóa hết</button>
+        <button class="btn-primary" onclick="submitOrder()" style="padding: 10px 25px;">💰 THANH TOÁN</button>
+    </div>
+</div>
+
+</div>
+
+<script>
+const API_PRODUCTS = "/api/products";
+const API_ORDERS = "/api/orders";
+
+let productCache = new Map(); // All fetched products
+let cart = new Map();
+let currentCategory = "All";
+
+/* ================= TOAST ================= */
+function toast(message, type = "info", timeout = 2500) {
+    const container = document.getElementById("toast-container");
+    const div = document.createElement("div");
+    div.className = `toast ${type}`;
+    div.innerText = message;
+    container.appendChild(div);
+
+    setTimeout(() => {
+        div.style.opacity = "0";
+        div.style.transform = "translateX(20px)";
+        div.style.transition = "0.2s";
+        setTimeout(() => div.remove(), 200);
+    }, timeout);
+}
+
+/* ================= FETCH ================= */
+async function fetchJSON(url) {
+    try {
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (e) {
+        return null;
+    }
+}
+
+/* ================= PRODUCTS & CATEGORIES ================= */
+async function loadProducts() {
+    const data = await fetchJSON(`${API_PRODUCTS}?limit=200&offset=0&active_only=true`);
+    if (!data) return;
+
+    productCache.clear();
+    data.data.forEach(p => productCache.set(p.id, p));
+
+    renderCategoryBar();
+    filterByCategory("All");
+    toast("Đã cập nhật danh sách", "info");
+}
+
+function renderCategoryBar() {
+    const bar = document.getElementById("categoryBar");
+    
+    // Get unique categories
+    const categories = ["All", ...new Set([...productCache.values()].map(p => p.category))];
+    
+    bar.innerHTML = categories.map(cat => `
+        <button class="btn-cat ${currentCategory === cat ? 'active' : ''}" 
+                onclick="filterByCategory('${cat}')">
+            ${cat}
+        </button>
+    `).join('');
+}
+
+function filterByCategory(cat) {
+    currentCategory = cat;
+    renderCategoryBar(); // update active state
+    
+    const allItems = [...productCache.values()];
+    const filtered = cat === "All" 
+        ? allItems 
+        : allItems.filter(p => p.category === cat);
+    
+    document.getElementById("displayTitle").innerText = `📦 ${cat}`;
+    renderProducts(filtered);
+}
+
+async function searchProducts() {
+    const q = document.getElementById("search").value;
+    if(!q) { loadProducts(); return; }
+
+    const data = await fetchJSON(
+        `${API_PRODUCTS}/search?q=${encodeURIComponent(q)}&active_only=true`
+    );
+
+    if (data) {
+        renderProducts(data.data);
+        document.getElementById("displayTitle").innerText = `🔍 Kết quả cho: "${q}"`;
+    }
+}
+
+/* ================= RENDER PRODUCTS ================= */
+function renderProducts(products) {
+    const container = document.getElementById("productList");
+    container.innerHTML = "";
+
+    products.forEach(p => {
+        const div = document.createElement("div");
+        div.className = "product-card";
+        div.onclick = () => addToCart(p.id);
+
+        const img = p.image_url
+            ? `<img class="product-img" src="${p.image_url}" loading="lazy">`
+            : `<div class="product-img" style="display:flex; align-items:center; justify-content:center; background:#eee; color:#ccc;">No Img</div>`;
+
+        div.innerHTML = `
+            ${img}
+            <div class="product-info">
+                <div class="product-cat-tag">${p.category}</div>
+                <div class="product-name">${p.name}</div>
+                <div class="product-price">${p.price.toLocaleString()}đ</div>
+            </div>
+        `;
+        container.appendChild(div);
+    });
+}
+
+/* ================= CART ================= */
+function addToCart(id) {
+    const p = productCache.get(id);
+    if (!p) return;
+
+    if (!cart.has(id)) {
+        cart.set(id, { product: p, quantity: 1 });
+    } else {
+        cart.get(id).quantity++;
+    }
+
+    renderCart();
+    toast(`+ ${p.name}`, "success", 1000);
+}
+
+function renderCart() {
+    const tbody = document.getElementById("cart");
+    tbody.innerHTML = "";
+    let total = 0;
+
+    cart.forEach((item, id) => {
+        const lineTotal = item.quantity * item.product.price;
+        total += lineTotal;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>
+                <div style="font-weight:bold;">${item.product.name}</div>
+                <div style="font-size:11px; color:#888;">ID: ${id}</div>
+            </td>
+            <td>
+                <input type="number" value="${item.quantity}" min="1" 
+                    style="width:40px; padding:4px;"
+                    onchange="updateQty(${id}, this.value)">
+            </td>
+            <td style="text-align:right;">${lineTotal.toLocaleString()}</td>
+            <td style="text-align:right;">
+                <button onclick="removeItem(${id})" style="color:red; border:none; background:none;">✕</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById("total").innerText = "Tổng cộng: " + total.toLocaleString() + "đ";
+}
+
+function updateQty(id, qty) {
+    qty = parseInt(qty);
+    if (qty <= 0) { removeItem(id); return; }
+    if (cart.has(id)) {
+        cart.get(id).quantity = qty;
+        renderCart();
+    }
+}
+
+function removeItem(id) {
+    cart.delete(id);
+    renderCart();
+}
+
+function clearCart() {
+    if(cart.size === 0) return;
+    if(confirm("Bạn có chắc muốn xóa giỏ hàng?")) {
+        cart.clear();
+        renderCart();
+        toast("Đã xóa giỏ hàng", "info");
+    }
+}
+
+/* ================= ORDER ================= */
+async function submitOrder() {
+    if (cart.size === 0) {
+        toast("Vui lòng chọn sản phẩm", "error");
+        return;
+    }
+
+    const items = [];
+    cart.forEach((v, id) => {
+        items.push({ product_id: id, quantity: v.quantity });
+    });
+
+    try {
+        const res = await fetch(API_ORDERS, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            toast(`Thành công! Đơn hàng #${data.id}`, "success");
+            cart.clear();
+            renderCart();
+        } else {
+            toast("Lỗi khi tạo đơn hàng", "error");
+        }
+    } catch (e) {
+        toast("Lỗi kết nối server", "error");
+    }
+}
+
+/* init */
+loadProducts();
+</script>
+
+<link rel="stylesheet" href="/thimpos.css">
+<script src="/thimpos.js" defer></script>
+
+</body>
+</html>

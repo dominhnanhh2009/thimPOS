@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>ThimPOS - Products</title>
+    <style>
+        body {
+            font-family: Arial;
+            padding: 20px;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        input, button, select {
+            padding: 6px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            vertical-align: middle;
+        }
+
+        tr.inactive {
+            opacity: 0.5;
+        }
+
+        .thumb {
+            width: 48px;
+            height: 48px;
+            object-fit: cover;
+            border-radius: 6px;
+            background: #eee;
+        }
+
+        .img-input {
+            width: 260px;
+        }
+
+        .actions button {
+            margin-right: 5px;
+        }
+
+        .url-cell {
+            font-size: 12px;
+            max-width: 220px;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+
+<h1>📦 Products</h1>
+
+<!-- CREATE -->
+<h3>➕ Tạo sản phẩm</h3>
+<div class="row">
+    <input id="name" placeholder="Tên">
+    <input id="price" type="number" placeholder="Giá">
+    <input id="desc" placeholder="Mô tả">
+    <input id="category" placeholder="Category (drink, food...)">
+    <input id="image_url" class="img-input" placeholder="Image URL (https://...)">
+    <button onclick="createProduct()">Tạo</button>
+</div>
+
+<!-- SEARCH -->
+<h3>🔎 Search</h3>
+<div class="row">
+    <input id="search" placeholder="Từ khóa...">
+    <input id="search_category" placeholder="Category">
+    
+    <select id="search_active">
+        <option value="false">All</option>
+        <option value="true">Only Active</option>
+    </select>
+
+    <button onclick="searchProducts()">Search</button>
+    <button onclick="loadProducts()">Reset</button>
+</div>
+
+<!-- LIST -->
+<h3>📋 Danh sách</h3>
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Ảnh</th>
+            <th>Tên</th>
+            <th>Giá</th>
+            <th>Mô tả</th>
+            <th>Category</th>
+            <th>Image URL</th>
+            <th>Active</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+
+    <tbody id="productTable"></tbody>
+</table>
+
+<script>
+const API = "/api/products";
+
+async function fetchJSON(url, options = {}) {
+    const res = await fetch(url, {
+        headers: { "Content-Type": "application/json" },
+        ...options
+    });
+
+    if (!res.ok) {
+        console.error("HTTP error", res.status);
+        return null;
+    }
+
+    return res.json();
+}
+
+function render(products) {
+    const tbody = document.getElementById("productTable");
+    tbody.innerHTML = "";
+
+    products.forEach(p => {
+        const tr = document.createElement("tr");
+        if (!p.is_active) tr.classList.add("inactive");
+
+        const img = p.image_url
+            ? `<img class="thumb" src="${p.image_url}">`
+            : `<div class="thumb"></div>`;
+
+        tr.innerHTML = `
+            <td>${p.id}</td>
+
+            <td>${img}</td>
+
+            <td contenteditable="true" data-field="name">${p.name}</td>
+
+            <td contenteditable="true" data-field="price">${p.price}</td>
+
+            <td contenteditable="true" data-field="description">${p.description || ""}</td>
+
+            <td contenteditable="true" data-field="category">
+                ${p.category || ""}
+            </td>
+
+            <td class="url-cell" contenteditable="true" data-field="image_url">
+                ${p.image_url || ""}
+            </td>
+
+            <td>
+                <input type="checkbox"
+                    data-field="is_active"
+                    ${p.is_active ? "checked" : ""}>
+            </td>
+
+            <td class="actions">
+                <button onclick="updateProduct(${p.id}, this)">💾</button>
+                <button onclick="deleteProduct(${p.id})">🗑️</button>
+            </td>
+        `;
+
+        tbody.appendChild(tr);
+    });
+}
+
+/* LOAD */
+async function loadProducts() {
+    const data = await fetchJSON(`${API}?limit=50&offset=0&active_only=false`);
+    if (!data) return;
+    render(data.data);
+}
+
+/* SEARCH (ENHANCED) */
+async function searchProducts() {
+    const q = document.getElementById("search").value;
+    const category = document.getElementById("search_category").value;
+    const active = document.getElementById("search_active").value;
+
+    const params = new URLSearchParams({
+        q,
+        category,
+        active_only: active,
+        limit: 50,
+        offset: 0
+    });
+
+    const data = await fetchJSON(`${API}/search?${params.toString()}`);
+
+    if (!data) return;
+    render(data.data);
+}
+
+/* CREATE */
+async function createProduct() {
+    const payload = {
+        name: document.getElementById("name").value,
+        price: parseInt(document.getElementById("price").value),
+        description: document.getElementById("desc").value,
+        image_url: document.getElementById("image_url").value,
+        category: document.getElementById("category").value
+    };
+
+    const res = await fetchJSON(API, {
+        method: "POST",
+        body: JSON.stringify(payload)
+    });
+
+    if (res) loadProducts();
+}
+
+/* UPDATE */
+async function updateProduct(id, btn) {
+    const tr = btn.closest("tr");
+
+    const payload = {
+        name: tr.querySelector('[data-field="name"]').innerText.trim(),
+        price: parseInt(tr.querySelector('[data-field="price"]').innerText),
+        description: tr.querySelector('[data-field="description"]').innerText.trim(),
+        image_url: tr.querySelector('[data-field="image_url"]').innerText.trim(),
+        category: tr.querySelector('[data-field="category"]').innerText.trim(),
+        is_active: tr.querySelector('[data-field="is_active"]').checked
+    };
+
+    await fetchJSON(`${API}/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload)
+    });
+
+    loadProducts();
+}
+
+/* DELETE */
+async function deleteProduct(id) {
+    await fetchJSON(`${API}/${id}`, {
+        method: "DELETE"
+    });
+
+    loadProducts();
+}
+
+loadProducts();
+</script>
+
+<link rel="stylesheet" href="/thimpos.css">
+<script src="/thimpos.js" defer></script>
+
+</body>
+</html>

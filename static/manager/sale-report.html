@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Báo cáo bán hàng</title>
+
+<style>
+body {
+    font-family: system-ui;
+    background:#0f1115;
+    color:#eee;
+    padding:20px;
+}
+
+.card {
+    background:#1b1e24;
+    padding:16px;
+    border-radius:12px;
+    margin-bottom:16px;
+}
+
+.row {
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+input, button, select {
+    padding:8px;
+    border-radius:6px;
+    border:none;
+    background:#2a2f3a;
+    color:#eee;
+}
+
+button { background:#4f8cff; cursor:pointer; }
+
+.chart-wrap {
+    overflow-x:auto;
+}
+
+canvas {
+    background:#111;
+    border-radius:10px;
+    display:block;
+}
+
+.table {
+    width:100%;
+    border-collapse: collapse;
+}
+
+.table th, .table td {
+    padding:8px;
+    border-bottom:1px solid #333;
+}
+
+.table th {
+    cursor:pointer;
+}
+
+.peaks {
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
+    gap:10px;
+}
+
+.peak {
+    background:#222733;
+    padding:10px;
+    border-radius:8px;
+}
+</style>
+
+</head>
+
+<body>
+
+<h1>📊 Báo cáo bán hàng</h1>
+
+<div class="card">
+    <div class="row">
+        <input type="datetime-local" id="from">
+        <input type="datetime-local" id="to">
+
+        <select id="preset">
+            <option value="today">Hôm nay</option>
+            <option value="week">Tuần này</option>
+            <option value="month">Tháng này</option>
+            <option value="year">Năm nay</option>
+            <option value="all">Tất cả</option>
+        </select>
+
+        <button onclick="generate()">Tạo báo cáo</button>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📈 Biểu đồ doanh thu</h3>
+    <div class="chart-wrap">
+        <canvas id="chartRevenue" height="300"></canvas>
+    </div>
+</div>
+
+<div class="card">
+    <h3>📊 Doanh thu theo sản phẩm</h3>
+    <div class="chart-wrap">
+        <canvas id="chartProduct" height="300"></canvas>
+    </div>
+</div>
+
+<div class="card">
+    <h3>🔥 Thống kê nổi bật</h3>
+    <div class="peaks" id="peaks"></div>
+</div>
+
+<div class="card">
+    <h3>📦 Thống kê sản phẩm</h3>
+    <table class="table">
+        <thead>
+            <tr>
+                <th data-key="name">Tên</th>
+                <th data-key="sold">Đã bán</th>
+                <th data-key="revenue">Doanh thu</th>
+            </tr>
+        </thead>
+        <tbody id="table"></tbody>
+    </table>
+</div>
+
+<script>
+let productMap = new Map();
+let sort = { key:"revenue", asc:false };
+
+function toInput(d){
+    return d.toISOString().slice(0,16);
+}
+
+function formatMoney(v){
+    return v.toLocaleString("vi-VN") + "đ";
+}
+
+function applyPreset() {
+    const now = new Date();
+    let from = new Date();
+
+    const p = document.getElementById("preset").value;
+
+    if (p==="today") from.setHours(0,0,0,0);
+    else if (p==="week") from.setDate(now.getDate()-7);
+    else if (p==="month") from.setMonth(now.getMonth()-1);
+    else if (p==="year") from.setFullYear(now.getFullYear()-1);
+    else if (p==="all") from = new Date(0);
+
+    document.getElementById("from").value = toInput(from);
+    document.getElementById("to").value = toInput(now);
+}
+
+document.getElementById("preset").addEventListener("change", applyPreset);
+applyPreset();
+
+async function generate(){
+    const from = new Date(document.getElementById("from").value).getTime()/1000;
+    const to   = new Date(document.getElementById("to").value).getTime()/1000;
+
+    let orders=[], offset=0;
+
+    while(true){
+        let res = await fetch(`/api/orders?limit=50&offset=${offset}`);
+        let data = await res.json();
+        if(!data.items.length) break;
+
+        for(let o of data.items){
+            if(o.created_at>=from && o.created_at<=to){
+                let d = await fetch(`/api/orders/${o.id}`).then(r=>r.json());
+                orders.push(d);
+            }
+        }
+        offset+=50;
+    }
+
+    render(orders);
+}
+
+function render(orders){
+    productMap.clear();
+    let timeline = {};
+
+    for(let o of orders){
+        let day = new Date(o.created_at*1000).toISOString().slice(0,10);
+        timeline[day]=(timeline[day]||0)+o.total_price;
+
+        for(let i of o.items){
+            if(!productMap.has(i.product_name))
+                productMap.set(i.product_name,{sold:0,revenue:0});
+
+            let p = productMap.get(i.product_name);
+            p.sold+=i.quantity;
+            p.revenue+=i.line_total;
+        }
+    }
+
+    drawLineChart(timeline);
+    drawProductChart();
+    renderTable();
+    renderPeaks();
+}
+
+function drawLineChart(timeline){
+    const c = document.getElementById("chartRevenue");
+    const ctx = c.getContext("2d");
+
+    let entries = Object.entries(timeline)
+        .map(([day,val])=>({day,val,ts:new Date(day).getTime()}))
+        .sort((a,b)=>a.ts-b.ts);
+
+    if(entries.length < 2) return;
+
+    // width động
+    c.width = Math.max(800, entries.length * 80);
+
+    let pad=40;
+    let w=c.width-pad*2;
+    let h=c.height-pad*2;
+    let max=Math.max(...entries.map(e=>e.val));
+
+    function drawBase(){
+        ctx.clearRect(0,0,c.width,c.height);
+
+        ctx.strokeStyle="#333";
+        ctx.fillStyle="#aaa";
+        ctx.font="10px sans-serif";
+
+        for(let i=0;i<=5;i++){
+            let y=pad+h-(i/5)*h;
+            let val=Math.round(max*(i/5));
+
+            ctx.beginPath();
+            ctx.moveTo(pad,y);
+            ctx.lineTo(pad+w,y);
+            ctx.stroke();
+
+            ctx.fillText(formatMoney(val),2,y+3);
+        }
+
+        let points=[];
+
+        ctx.strokeStyle="#4f8cff";
+        ctx.beginPath();
+
+        entries.forEach((e,i)=>{
+            let x=pad+(i/(entries.length-1))*w;
+            let y=pad+h-(e.val/max)*h;
+
+            points.push({x,y,data:e});
+
+            if(i===0) ctx.moveTo(x,y);
+            else ctx.lineTo(x,y);
+
+            ctx.fillStyle="#aaa";
+            ctx.fillText(e.day.slice(5), x-10, c.height-5);
+        });
+
+        ctx.stroke();
+
+        ctx.fillStyle="#4f8cff";
+        points.forEach(p=>{
+            ctx.beginPath();
+            ctx.arc(p.x,p.y,3,0,Math.PI*2);
+            ctx.fill();
+        });
+
+        return points;
+    }
+
+    let points = drawBase();
+
+    c.onmousemove = (ev)=>{
+        let r=c.getBoundingClientRect();
+        let mx=ev.clientX-r.left;
+        let my=ev.clientY-r.top;
+
+        drawBase();
+
+        let found = points.find(p=>Math.hypot(p.x-mx,p.y-my)<6);
+        if(found){
+            ctx.fillStyle="#fff";
+            ctx.fillText(
+                `${found.data.day}: ${formatMoney(found.data.val)}`,
+                found.x+10,
+                found.y-10
+            );
+        }
+    };
+}
+
+function drawProductChart(){
+    const c = document.getElementById("chartProduct");
+    const ctx = c.getContext("2d");
+
+    let arr=[...productMap.entries()]
+        .sort((a,b)=>b[1].revenue-a[1].revenue);
+
+    if(!arr.length) return;
+
+    // width động theo số sản phẩm
+    c.width = Math.max(800, arr.length * 100);
+
+    let pad=40;
+    let w=c.width-pad*2;
+    let h=c.height-pad*2;
+    let max=Math.max(...arr.map(x=>x[1].revenue));
+    let barW=w/arr.length;
+
+    let bars=[];
+
+    function drawBase(){
+        ctx.clearRect(0,0,c.width,c.height);
+        bars=[];
+
+        arr.forEach((x,i)=>{
+            let val=x[1].revenue;
+            let bh=val/max*h;
+
+            let bx=pad+i*barW;
+            let by=pad+h-bh;
+
+            let bar = {bx,by,bw:barW-10,bh,data:x};
+            bars.push(bar);
+
+            ctx.fillStyle="#00d084";
+            ctx.fillRect(bar.bx,bar.by,bar.bw,bar.bh);
+
+            ctx.fillStyle="#aaa";
+            ctx.fillText(x[0], bar.bx, c.height-5);
+
+            ctx.fillStyle="#fff";
+            ctx.fillText(formatMoney(val), bar.bx, bar.by-5);
+        });
+    }
+
+    drawBase();
+
+    c.onmousemove=(ev)=>{
+        let r=c.getBoundingClientRect();
+        let mx=ev.clientX-r.left;
+        let my=ev.clientY-r.top;
+
+        drawBase();
+
+        bars.forEach(b=>{
+            if(mx>=b.bx && mx<=b.bx+b.bw && my>=b.by && my<=b.by+b.bh){
+                ctx.fillStyle="#4f8cff";
+                ctx.fillRect(b.bx,b.by,b.bw,b.bh);
+            }
+        });
+    };
+}
+
+function renderTable(){
+    let arr=[...productMap.entries()];
+
+    arr.sort((a,b)=>{
+        let v1 = sort.key==="name"?a[0]:a[1][sort.key];
+        let v2 = sort.key==="name"?b[0]:b[1][sort.key];
+
+        if (typeof v1 === "string")
+            return sort.asc ? v1.localeCompare(v2) : v2.localeCompare(v1);
+
+        return sort.asc ? v1 - v2 : v2 - v1;
+    });
+
+    document.getElementById("table").innerHTML = arr.map(x=>`
+        <tr>
+            <td>${x[0]}</td>
+            <td>${x[1].sold}</td>
+            <td>${formatMoney(x[1].revenue)}</td>
+        </tr>
+    `).join("");
+}
+
+document.querySelectorAll("th").forEach(th=>{
+    th.onclick=()=>{
+        let k=th.dataset.key;
+        if(sort.key===k) sort.asc=!sort.asc;
+        else { sort.key=k; sort.asc=false; }
+        renderTable();
+    };
+});
+
+function renderPeaks(){
+    let arr=[...productMap.entries()];
+
+    let topSold=[...arr].sort((a,b)=>b[1].sold-a[1].sold).slice(0,3);
+    let lowSold=[...arr].sort((a,b)=>a[1].sold-b[1].sold).slice(0,3);
+    let topRevenue=[...arr].sort((a,b)=>b[1].revenue-a[1].revenue).slice(0,3);
+
+    document.getElementById("peaks").innerHTML = `
+        <div class="peak">
+            🔥 Bán chạy:
+            ${topSold.map(x=>`<div>${x[0]} (${x[1].sold})</div>`).join("")}
+        </div>
+
+        <div class="peak">
+            🥶 Bán ít:
+            ${lowSold.map(x=>`<div>${x[0]} (${x[1].sold})</div>`).join("")}
+        </div>
+
+        <div class="peak">
+            💰 Doanh thu cao:
+            ${topRevenue.map(x=>`<div>${x[0]} (${formatMoney(x[1].revenue)})</div>`).join("")}
+        </div>
+    `;
+}
+</script>
+
+
+<link rel="stylesheet" href="/thimpos.css">
+<script src="/thimpos.js" defer></script>
+</body>
+</html>

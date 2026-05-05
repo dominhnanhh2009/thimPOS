@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Account Manager</title>
+
+<style>
+body {
+    font-family: system-ui;
+    background: #0f172a;
+    color: #e2e8f0;
+    margin: 0;
+    padding: 20px;
+}
+
+.panel {
+    background: #020617;
+    padding: 14px;
+    border-radius: 12px;
+    margin-top: 16px;
+}
+
+input, select {
+    padding: 8px;
+    border-radius: 8px;
+    border: none;
+    margin: 4px;
+    background: #1e293b;
+    color: white;
+}
+
+button {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    background: #2563eb;
+    color: white;
+}
+button.danger { background: #dc2626; }
+button.gray { background: #475569; }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+td, th {
+    padding: 8px;
+    border-bottom: 1px solid #334155;
+    text-align: left;
+}
+tr:hover { background: #1e293b; }
+
+#toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 999;
+}
+.toast {
+    padding: 10px 14px;
+    margin-top: 8px;
+    border-radius: 8px;
+    background: #1e293b;
+}
+.toast.success { border-left: 4px solid #22c55e; }
+.toast.error { border-left: 4px solid #ef4444; }
+
+#modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+.modal-box {
+    background: #020617;
+    padding: 20px;
+    border-radius: 12px;
+    width: 380px;
+    display: flex;
+    flex-direction: column;
+}
+.modal-box label {
+    font-size: 0.85rem;
+    margin-top: 8px;
+    color: #94a3b8;
+}
+</style>
+</head>
+
+<body>
+
+<h1 style="color: #dc2626;">quản lý tài khoản và mật khẩu</h1>
+
+<div id="toast"></div>
+
+<div id="modal">
+    <div class="modal-box" id="modalContent"></div>
+</div>
+
+<div class="panel">
+<h3>👤 Accounts (Business Profile)</h3>
+
+<input id="c_username" placeholder="username">
+<select id="c_role">
+    <option value="manager">manager</option>
+    <option value="staff">staff</option>
+</select>
+<input id="c_email" placeholder="email">
+<input id="c_phone" placeholder="phone">
+<input id="c_name" placeholder="full name">
+<input id="c_dob" placeholder="YYYY-MM-DD (DOB)">
+
+<button onclick="createAccount()">Create</button>
+
+<table id="table" style="margin-top:10px;"></table>
+</div>
+
+<div class="panel">
+<h3>🔐 AuthN (Credentials System)</h3>
+
+<button onclick="openCreateCredential()">+ Tạo username/password</button>
+
+<div id="credentials" style="margin-top:10px;"></div>
+</div>
+
+<div class="panel">
+<h3>Sessions</h3>
+<button onclick="loadSessions()">Load My Sessions</button>
+<div id="sessions"></div>
+</div>
+
+<script>
+
+/* =========================
+   UTIL
+========================= */
+
+function toast(msg, type="success") {
+    const box = document.createElement("div");
+    box.className = "toast " + type;
+    box.innerText = msg;
+    document.getElementById("toast").appendChild(box);
+    setTimeout(() => box.remove(), 3000);
+}
+
+function showModal(html) {
+    document.getElementById("modalContent").innerHTML = html;
+    document.getElementById("modal").style.display = "flex";
+}
+
+function closeModal() {
+    document.getElementById("modal").style.display = "none";
+}
+
+async function api(url, method="GET", body=null) {
+    const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: body ? JSON.stringify(body) : null
+    });
+
+    const txt = await res.text();
+    try { return JSON.parse(txt); }
+    catch { throw txt; }
+}
+
+/* =========================
+   👤 ACCOUNT DOMAIN
+========================= */
+
+async function loadAccounts() {
+    const res = await api("/api/accounts");
+
+    if (res.status !== "success")
+        return toast(res.message, "error");
+
+    const table = document.getElementById("table");
+
+    table.innerHTML = `
+        <tr>
+            <th>Username</th>
+            <th>Role</th>
+            <th>Full Name</th>
+            <th>Actions</th>
+        </tr>
+    `;
+
+    res.data.forEach(a => {
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+            <td>${a.username}</td>
+            <td>${a.role}</td>
+            <td>${a.full_name || "-"}</td>
+            <td>
+                <button onclick="openEditAccount('${a.username}')">Edit</button>
+                <button class="danger" onclick="confirmDeleteAccount('${a.username}')">Delete</button>
+            </td>
+        `;
+
+        table.appendChild(tr);
+    });
+}
+
+async function createAccount() {
+    const res = await api("/api/accounts", "POST", {
+        username: document.getElementById("c_username").value,
+        role: document.getElementById("c_role").value,
+        email: document.getElementById("c_email").value,
+        phone_number: document.getElementById("c_phone").value,
+        full_name: document.getElementById("c_name").value,
+        date_of_birth: document.getElementById("c_dob").value,
+        avatar_url: ""
+    });
+
+    if (res.status !== "success")
+        return toast(res.message, "error");
+
+    toast("account created");
+    loadAccounts();
+}
+
+function confirmDeleteAccount(u) {
+    showModal(`
+        <h3>Delete Account ${u}?</h3>
+        <p>This action only deletes the profile, not the credentials.</p>
+        <div style="margin-top:12px;">
+            <button class="danger" onclick="deleteAccount('${u}')">Confirm</button>
+            <button class="gray" onclick="closeModal()">Cancel</button>
+        </div>
+    `);
+}
+
+async function deleteAccount(u) {
+    const res = await api("/api/accounts/" + u, "DELETE");
+
+    if (res.status !== "success")
+        return toast(res.message, "error");
+
+    closeModal();
+    toast("account deleted");
+    loadAccounts();
+}
+
+async function openEditAccount(u) {
+    const res = await api("/api/accounts/" + u);
+
+    if (res.status !== "success")
+        return toast(res.message, "error");
+
+    const a = res.data;
+
+    showModal(`
+        <h3>Edit Account: ${u}</h3>
+        
+        <label>Full Name</label>
+        <input id="e_name" value="${a.full_name || ""}" placeholder="Full name">
+
+        <label>Role</label>
+        <select id="e_role">
+            <option value="manager" ${a.role === 'manager' ? 'selected' : ''}>manager</option>
+            <option value="staff" ${a.role === 'staff' ? 'selected' : ''}>staff</option>
+        </select>
+
+        <label>Email</label>
+        <input id="e_email" value="${a.email || ""}" placeholder="Email">
+
+        <label>Phone Number</label>
+        <input id="e_phone" value="${a.phone_number || ""}" placeholder="Phone">
+
+        <label>Date of Birth</label>
+        <input id="e_dob" value="${a.date_of_birth || ""}" placeholder="YYYY-MM-DD">
+
+        <div style="margin-top:20px;">
+            <button onclick="saveAccount('${u}')">Save Changes</button>
+            <button class="gray" onclick="closeModal()">Cancel</button>
+        </div>
+    `);
+}
+
+async function saveAccount(u) {
+    const res = await api("/api/accounts/" + u, "PUT", {
+        full_name: document.getElementById("e_name").value,
+        role: document.getElementById("e_role").value,
+        email: document.getElementById("e_email").value,
+        phone_number: document.getElementById("e_phone").value,
+        date_of_birth: document.getElementById("e_dob").value
+    });
+
+    if (res.status !== "success")
+        return toast(res.message, "error");
+
+    closeModal();
+    toast("account updated successfully");
+    loadAccounts();
+}
+
+/* =========================
+   🔐 AUTHN DOMAIN
+========================= */
+
+async function loadCredentials() {
+    const res = await api("/auth/users");
+
+    if (!res.users)
+        return toast("failed load credentials", "error");
+
+    const box = document.getElementById("credentials");
+    box.innerHTML = "";
+
+    res.users.forEach(u => {
+        const div = document.createElement("div");
+        div.style.padding = "8px";
+        div.style.borderBottom = "1px solid #334155";
+        div.style.display = "flex";
+        div.style.justifyContent = "space-between";
+        div.style.alignItems = "center";
+
+        div.innerHTML = `
+            <span><b>${u}</b></span>
+            <div>
+                <button onclick="openChangePassword('${u}')">Change Password</button>
+                <button class="danger" onclick="confirmDeleteCredential('${u}')">Delete Credential</button>
+            </div>
+        `;
+
+        box.appendChild(div);
+    });
+}
+
+function openCreateCredential() {
+    showModal(`
+        <h3>Create Credential</h3>
+        <input id="n_user" placeholder="username">
+        <input id="n_pass" placeholder="password" type="password">
+        <br>
+        <button onclick="createCredential()">Create</button>
+        <button class="gray" onclick="closeModal()">Cancel</button>
+    `);
+}
+
+async function createCredential() {
+    const res = await api("/auth/register", "POST", {
+        username: document.getElementById("n_user").value,
+        password: document.getElementById("n_pass").value
+    });
+
+    if (!res.success)
+        return toast(res.error || "failed", "error");
+
+    closeModal();
+    toast("credential created");
+    loadCredentials();
+}
+
+function openChangePassword(u) {
+    showModal(`
+        <h3>Change Password: ${u}</h3>
+        <input id="cp_pass" type="password" placeholder="new password">
+        <br>
+        <button onclick="changePassword('${u}')">Save</button>
+        <button class="gray" onclick="closeModal()">Cancel</button>
+    `);
+}
+
+async function changePassword(u) {
+    const res = await api("/auth/change_password", "POST", {
+        username: u,
+        new_password: document.getElementById("cp_pass").value
+    });
+
+    if (!res.success)
+        return toast(res.error || "failed", "error");
+
+    closeModal();
+    toast("password updated");
+}
+
+function confirmDeleteCredential(u) {
+    showModal(`
+        <h3>Delete Credential: ${u}?</h3>
+        <p style="color: #ef4444;">Warning: This will revoke all sessions and permanentely delete login access for this user.</p>
+        <div style="margin-top:12px;">
+            <button class="danger" onclick="deleteCredential('${u}')">Confirm Delete</button>
+            <button class="gray" onclick="closeModal()">Cancel</button>
+        </div>
+    `);
+}
+
+async function deleteCredential(u) {
+    const res = await api("/auth/users/" + u, "DELETE");
+
+    if (!res.success)
+        return toast(res.error || "failed", "error");
+
+    closeModal();
+    toast("credential deleted successfully");
+    loadCredentials();
+}
+
+/* =========================
+   SESSIONS
+========================= */
+
+async function loadSessions() {
+    const res = await api("/auth/sessions");
+
+    if (!res.sessions)
+        return toast("failed", "error");
+
+    const box = document.getElementById("sessions");
+    box.innerHTML = "";
+
+    res.sessions.forEach(s => {
+        const div = document.createElement("div");
+        div.style.padding = "4px 0";
+        div.innerHTML = `<code>${s}</code> <button class="danger" style="padding:2px 6px; font-size:11px;" onclick="deleteSession('${s}')">kill</button>`;
+        box.appendChild(div);
+    });
+
+    const btn = document.createElement("button");
+    btn.className = "danger";
+    btn.style.marginTop = "10px";
+    btn.innerText = "Logout All Sessions";
+    btn.onclick = logoutAll;
+    box.appendChild(btn);
+}
+
+async function deleteSession(t) {
+    await api("/auth/sessions/" + t, "DELETE");
+    toast("session removed");
+    loadSessions();
+}
+
+async function logoutAll() {
+    await api("/auth/logout_all", "POST");
+    toast("all sessions killed");
+    loadSessions();
+}
+
+/* INIT */
+loadAccounts();
+loadCredentials();
+
+</script>
+
+
+<link rel="stylesheet" href="/thimpos.css">
+<script src="/thimpos.js" defer></script>
+</body>
+</html>

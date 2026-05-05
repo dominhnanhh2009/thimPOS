@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Đăng nhập hệ thống</title>
+  <style>
+    :root { --primary: #2563eb; --error: #dc2626; --success: #16a34a; --bg: #f3f4f6; }
+    body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    .card { background: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); width: 100%; max-width: 350px; }
+    h3 { margin: 0 0 1.5rem; text-align: center; color: #1f2937; }
+    input { width: 100%; padding: 0.75rem; margin-bottom: 1rem; border: 1px solid #d1d5db; border-radius: 4px; box-sizing: border-box; outline: none; }
+    input:focus { border-color: var(--primary); ring: 2px var(--primary); }
+    button { width: 100%; padding: 0.75rem; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; transition: opacity 0.2s; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    #msg { min-height: 1.25rem; margin-top: 1rem; font-size: 0.875rem; text-align: center; }
+    .error { color: var(--error); }
+    .success { color: var(--success); }
+    .link { display: block; text-align: center; margin-top: 1rem; font-size: 0.875rem; color: var(--primary); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h3>Đăng nhập</h3>
+  
+  <input id="username" type="text" placeholder="Tên đăng nhập" autocomplete="username" />
+  <input id="password" type="password" placeholder="Mật khẩu" autocomplete="current-password" />
+  
+  <button id="btnLogin" onclick="login()">Đăng nhập</button>
+
+  <p id="msg"></p>
+  
+  <a href="/auth/signup.html" class="link">Chưa có tài khoản? Đăng ký ngay</a>
+</div>
+
+<script>
+/**
+ * Hiển thị thông báo cho người dùng
+ * @param {string} text - Nội dung thông báo
+ * @param {string} type - Loại thông báo (error/success)
+ */
+function setMsg(text, type = "") {
+  const msgEl = document.getElementById("msg");
+  msgEl.textContent = text || "";
+  msgEl.className = type;
+}
+
+/**
+ * Xử lý logic đăng nhập
+ */
+async function login() {
+  const userInp = document.getElementById("username");
+  const passInp = document.getElementById("password");
+  const btn = document.getElementById("btnLogin");
+
+  // Kiểm tra dữ liệu đầu vào cơ bản
+  if (!userInp.value || !passInp.value) {
+    return setMsg("Vui lòng điền đầy đủ thông tin", "error");
+  }
+
+  // Khóa nút và xóa thông báo cũ
+  btn.disabled = true;
+  setMsg("Đang kiểm tra...", "");
+
+  try {
+    const response = await fetch("/auth/login", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      credentials: "include", // Quan trọng để gửi/nhận cookie session
+      body: JSON.stringify({
+        username: userInp.value,
+        password: passInp.value
+      })
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (result.success) {
+      setMsg("Đăng nhập thành công!", "success");
+      // Chuyển hướng sau 1 giây nếu cần
+      setTimeout(() => { window.location.href = "/"; }, 1000);
+    } else {
+      setMsg(result.error || "Tên đăng nhập hoặc mật khẩu không đúng", "error");
+    }
+  } catch (err) {
+    setMsg("Lỗi kết nối máy chủ", "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+
+</body>
+</html>
