@@ -22,6 +22,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(${PROJECT_NAME} main.cc)
 
+option(THIMPOS_IGNORE_KEY_CHECK
+       "Build ThimPOS without the startup license-key check (development only)"
+       OFF)
+
 # ##############################################################################
 # If you include the drogon source code locally in your project, use this method
 # to add drogon 
@@ -31,6 +35,18 @@ add_executable(${PROJECT_NAME} main.cc)
 # and comment out the following lines
 find_package(Drogon CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE Drogon::Drogon)
+
+if (THIMPOS_IGNORE_KEY_CHECK)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE THIMPOS_IGNORE_KEY_CHECK=1)
+    message(WARNING "ThimPOS license-key verification is DISABLED for this build")
+else ()
+    find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+    find_package(CURL REQUIRED)
+    target_sources(${PROJECT_NAME} PRIVATE license/KeyManagerClient.cc)
+    target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/license)
+    target_link_libraries(${PROJECT_NAME} PRIVATE OpenSSL::Crypto CURL::libcurl)
+    message(STATUS "ThimPOS license-key verification is enabled")
+endif ()
 
 # ##############################################################################
 
