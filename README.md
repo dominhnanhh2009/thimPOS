@@ -88,7 +88,7 @@ Khi khởi chạy với database mới, ThimPOS tự tạo tài khoản quản l
 
 Đăng nhập tại `http://localhost/auth/login.html`. Sau lần đăng nhập đầu tiên, hãy vào **Quản lý tài khoản nhân viên**, chọn credential `admin` và đổi mật khẩu ngay. Không tiếp tục sử dụng mật khẩu bootstrap khi triển khai thực tế.
 
-Credential bootstrap chỉ được tạo khi bảng credential chưa tồn tại. Việc khởi động lại server không ghi đè mật khẩu đã đổi.
+Credential bootstrap được tạo khi database chưa có credential nào. Việc khởi động lại server không ghi đè mật khẩu đã đổi và cũng không tạo lại `admin` nếu database đã có người dùng khác.
 
 ## Lưu trữ license
 

@@ -53,5 +53,15 @@ int main()
     drogon::app().loadConfigFile("config.json");
     //Run HTTP framework,the method will block in the internal event loop
     drogon::app().run();
+
+#ifdef _WIN32
+    // Drogon/Trantor's AsyncFileLogger destructor can deadlock while MinGW
+    // unloads DLLs after a clean shutdown. Plugins and event loops have already
+    // stopped when run() returns, so bypass only the faulty DLL destructors.
+    std::cout.flush();
+    std::cerr.flush();
+    TerminateProcess(GetCurrentProcess(), EXIT_SUCCESS);
+#endif
+
     return EXIT_SUCCESS;
 }
