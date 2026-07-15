@@ -279,6 +279,11 @@ HttpResult postJson(const std::string &apiUrl,
     curl_easy_setopt(client.get(), CURLOPT_POSTFIELDS, requestBody.c_str());
     curl_easy_setopt(client.get(), CURLOPT_POSTFIELDSIZE, static_cast<long>(requestBody.size()));
     curl_easy_setopt(client.get(), CURLOPT_TIMEOUT, static_cast<long>(kRequestTimeoutSeconds));
+#ifdef _WIN32
+    // Static OpenSSL builds do not automatically use Windows' trusted root store.
+    // Without this, HTTPS can fail only in the packaged build when no CA bundle is shipped.
+    curl_easy_setopt(client.get(), CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA);
+#endif
     curl_easy_setopt(client.get(), CURLOPT_WRITEFUNCTION,
                      +[](char *data, std::size_t size, std::size_t count, void *context) {
                          const auto bytes = size * count;
@@ -306,6 +311,9 @@ HttpResult get(const std::string &apiUrl, const std::string &path)
     const auto url = apiUrl + path;
     curl_easy_setopt(client.get(), CURLOPT_URL, url.c_str());
     curl_easy_setopt(client.get(), CURLOPT_TIMEOUT, static_cast<long>(kRequestTimeoutSeconds));
+#ifdef _WIN32
+    curl_easy_setopt(client.get(), CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA);
+#endif
     curl_easy_setopt(client.get(), CURLOPT_WRITEFUNCTION,
                      +[](char *data, std::size_t size, std::size_t count, void *context) {
                          const auto bytes = size * count;

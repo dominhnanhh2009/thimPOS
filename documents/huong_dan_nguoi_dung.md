@@ -53,6 +53,17 @@ Tài liệu này dành cho người sử dụng trực tiếp trên giao diện 
 
 ## Lưu ý khi thao tác
 
+### Xóa license đã lưu
+
+Chỉ thực hiện khi cần nhập lại license, đổi key hoặc khi bộ phận hỗ trợ yêu cầu:
+
+1. Đóng ThimPOS nếu chương trình đang chạy.
+2. Mở PowerShell tại thư mục chứa `ThimPOS.exe`.
+3. Chạy `./ThimPOS.exe --clear-license-cache`.
+4. Khi thấy thông báo **Đã xóa cache bản quyền**, mở ThimPOS lại và nhập license key.
+
+Lệnh này chỉ xóa thông tin license được lưu trên máy, không xóa sản phẩm, đơn hàng hay tài khoản. Hiện tại thao tác này không gửi yêu cầu hủy phiên license lên máy chủ.
+
 - Kiểm tra lại sản phẩm, số lượng và tổng tiền trước khi thanh toán hoặc in hóa đơn.
 - Các thao tác xóa không thể sử dụng lại dữ liệu đã xóa; chỉ xác nhận khi đã kiểm tra đúng đối tượng.
 - Nếu giao diện báo mất kết nối hoặc tải dữ liệu thất bại, kiểm tra kết nối rồi thử lại. Nếu lỗi vẫn còn, liên hệ người quản lý hệ thống.
